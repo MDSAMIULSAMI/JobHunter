@@ -17,7 +17,7 @@ logger = get_logger()
 app = create_app()
 
 # Include routers
-app.include_router(general_router)
+# app.include_router(general_router)
 app.include_router(job_router)
 app.include_router(resume_router)
 
