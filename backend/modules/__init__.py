@@ -1,5 +1,5 @@
 """
-Modules package for FastAPI JobSpy application.
+Modules package for FastAPI JobHunter application.
 Contains modular components for better code organization.
 """
 

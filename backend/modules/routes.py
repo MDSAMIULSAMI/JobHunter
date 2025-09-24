@@ -3,14 +3,17 @@ API route handlers for the FastAPI application.
 """
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import Dict, Any
 from datetime import datetime
+import json
+from .pdf_utils import PDFGenerator
 
 from .models import (
     JobSearchRequest, JobSearchResponse, 
     ResumeAnalysisResponse, CustomResumeRequest, CustomResumeResponse,
-    KeywordExtractionResponse, KeywordJobSearchRequest
+    KeywordExtractionResponse, KeywordJobSearchRequest,
+    JobResumeCustomizationRequest, JobResumeCustomizationResponse
 )
 from .services import JobService, ResumeService
 from .utils import get_available_sites
@@ -26,7 +29,7 @@ general_router = APIRouter(tags=["general"])
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "JobSpy FastAPI - Job Aggregation Service",
+        "message": "JobHunter FastAPI - Job Aggregation Service",
         "version": "1.0.0",
         "documentation": "/docs",
         "health": "/health"
@@ -39,8 +42,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "JobSpy FastAPI",
-        "version": "1.0.0"
+        "service": "JobHunter FastAPI",
+        "version": "1.0.6"
     }
 
 
@@ -176,6 +179,89 @@ async def custom_resume_builder(request: CustomResumeRequest):
     return await ResumeService.build_custom_resume(request)
 
 
+@resume_router.post("/custom-builder/pdf")
+async def custom_resume_builder_pdf(request: CustomResumeRequest):
+    """
+    Generate a tailored PDF resume based on job details and resume information
+    
+    - **job_details**: Job details/description for tailoring the resume (required)
+    - **resume_details**: Resume information to be tailored (required)
+    
+    Returns PDF file for download.
+    """
+    # Get the custom resume response which contains the LaTeX code
+    latex_response = await ResumeService.build_custom_resume(request)
+    
+    # Normalize LaTeX code so the PDF generator can use it
+    latex_code = latex_response.latex_code
+    try:
+        parsed = json.loads(latex_code)
+        if isinstance(parsed, dict):
+            # Try the expected nested path
+            candidate = parsed.get("result", {}).get("Output", {}).get("latex_resume")
+            if isinstance(candidate, str):
+                latex_code = candidate
+            else:
+                # Fallback: look for common top-level keys
+                for key in ("latex_resume", "latex_code"):
+                    val = parsed.get(key)
+                    if isinstance(val, str):
+                        latex_code = val
+                        break
+        elif isinstance(parsed, str):
+            # If the JSON is just a LaTeX string, use it directly
+            latex_code = parsed
+    except json.JSONDecodeError:
+        # Not JSON, keep as-is and try to unescape common sequences
+        pass
+
+    # Convert literal escaped sequences to their actual characters
+    if "\\n" in latex_code and "\n" not in latex_code:
+        latex_code = latex_code.replace("\\n", "\n")
+    if "\\t" in latex_code and "\t" not in latex_code:
+        latex_code = latex_code.replace("\\t", "\t")
+    if latex_code.startswith('"') and latex_code.endswith('"'):
+        latex_code = latex_code[1:-1]
+    
+    # Generate PDF from the LaTeX code
+    pdf_bytes = PDFGenerator.generate_pdf_from_latex(latex_code)
+    
+    # Return the PDF file
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "attachment; filename=customized_resume.pdf"
+        }
+    )
+
+
+@resume_router.post("/customize-for-job/pdf")
+async def customize_resume_for_job_pdf(request: JobResumeCustomizationRequest):
+    """
+    Generate a customized PDF resume for a specific job
+    
+    - **job_id**: Job ID for customization (required)
+    - **job_title**: Job title (required)
+    - **job_description**: Job description (required)
+    - **company_name**: Company name (required)
+    - **resume_data**: Resume data in string format (required)
+    
+    Returns PDF file for download.
+    """
+    pdf_bytes = await ResumeService.customize_resume_for_job_pdf(request)
+    
+    filename = f"resume_{request.job_title.replace(' ', '_').lower()}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
 # Legacy endpoints for backward compatibility
 @general_router.post("/search-jobs", response_model=JobSearchResponse)
 async def search_jobs_legacy(request: JobSearchRequest):
@@ -209,3 +295,18 @@ async def upload_resume_legacy(resume_file: UploadFile = File(..., description="
 async def custom_resume_builder_legacy(request: CustomResumeRequest):
     """Legacy endpoint - use /resume/custom-builder instead"""
     return await custom_resume_builder(request)
+
+@resume_router.post("/customize-for-job", response_model=JobResumeCustomizationResponse)
+async def customize_resume_for_job(request: JobResumeCustomizationRequest):
+    """
+    Generate a customized LaTeX resume for a specific job
+    
+    - **job_id**: Job ID for customization (required)
+    - **job_title**: Job title (required)
+    - **job_description**: Job description (required)
+    - **company_name**: Company name (required)
+    - **resume_data**: Resume data in string format (required)
+    
+    Returns LaTeX code for a job-specific tailored resume in the specified JSON structure.
+    """
+    return await ResumeService.customize_resume_for_job(request)

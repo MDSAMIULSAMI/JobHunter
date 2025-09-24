@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import LoadingSpinner from './LoadingSpinner'
 import JobCard from './JobCard'
+import ResumeDownloadModal from './ResumeDownloadModal'
 
 const JobSearch = () => {
   const [searchData, setSearchData] = useState({
@@ -12,6 +13,11 @@ const JobSearch = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchPerformed, setSearchPerformed] = useState(false)
+  
+  // New state for resume customization
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [customizedResumeData, setCustomizedResumeData] = useState(null)
+  const [selectedJob, setSelectedJob] = useState(null)
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -47,6 +53,12 @@ const JobSearch = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleResumeCustomized = (latexData, job) => {
+    setCustomizedResumeData(latexData)
+    setSelectedJob(job)
+    setShowDownloadModal(true)
   }
 
   return (
@@ -133,7 +145,12 @@ const JobSearch = () => {
           ) : jobs.length > 0 ? (
             <div className="grid gap-6">
               {jobs.map((job, index) => (
-                <JobCard key={job.id || index} job={job} />
+                <JobCard 
+                  key={job.id || index} 
+                  job={job} 
+                  resumeData={null} // No resume data in regular job search
+                  onResumeCustomized={handleResumeCustomized}
+                />
               ))}
             </div>
           ) : (
@@ -146,6 +163,14 @@ const JobSearch = () => {
           )}
         </div>
       )}
+
+      {/* Resume Download Modal */}
+      <ResumeDownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        latexData={customizedResumeData}
+        jobTitle={selectedJob?.title || 'Job'}
+      />
     </div>
   )
 }

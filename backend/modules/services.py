@@ -17,11 +17,14 @@ from fastapi import HTTPException
 from scraper import scrape_jobs
 from scraper.model import Site
 from .utils import get_available_sites, get_country_from_location, process_jobs_dataframe, handle_null_values
+from .pdf_utils import PDFGenerator
 from .models import (
     JobSearchRequest, JobSearchResponse, JobPost,
     ResumeAnalysisResponse, ResumeResult, ResumeOutput,
     KeywordExtractionResponse, KeywordJobSearchRequest,
-    CustomResumeRequest, CustomResumeResponse
+    CustomResumeRequest, CustomResumeResponse,
+    JobResumeCustomizationRequest, JobResumeCustomizationResponse,
+    LatexResumeResult, LatexResumeOutput
 )
 
 logger = logging.getLogger(__name__)
@@ -286,7 +289,7 @@ class ResumeService:
             }
             
             # Send request to the resume analysis API
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     os.getenv("RESUME_ANALYZER_API_URL"),
                     files=files
@@ -376,7 +379,7 @@ class ResumeService:
             }
             
             # Make request to the external LaTeX resume generator API
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     os.getenv("CUSTOM_RESUME_BUILDER_API_URL"),
                     json=payload,
@@ -389,7 +392,8 @@ class ResumeService:
                         success=True,
                         latex_code=latex_code,
                         message="LaTeX resume code generated successfully",
-                        timestamp=datetime.now().isoformat()
+                        timestamp=datetime.now().isoformat(),
+                        pdf_available=True
                     )
                 else:
                     logger.error(f"External API error: {response.status_code} - {response.text}")
@@ -412,6 +416,119 @@ class ResumeService:
             )
         except Exception as e:
             logger.error(f"Unexpected error in custom_resume_builder: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred while generating the resume"
+            )
+    
+    @staticmethod
+    async def build_custom_resume_pdf(request: CustomResumeRequest) -> bytes:
+        """Generate a tailored PDF resume based on job details and resume information."""
+        try:
+            # Get LaTeX code first
+            latex_response = await ResumeService.build_custom_resume(request)
+            
+            # Parse the LaTeX code if it's in JSON format
+            latex_code = latex_response.latex_code
+            try:
+                latex_data = json.loads(latex_code)
+                if latex_data.get("result", {}).get("Output", {}).get("latex_resume"):
+                    latex_code = latex_data["result"]["Output"]["latex_resume"]
+            except (json.JSONDecodeError, KeyError):
+                # If it's not JSON or doesn't have the expected structure, use as is
+                pass
+            
+            # Generate PDF from LaTeX
+            pdf_bytes = PDFGenerator.generate_pdf_from_latex(latex_code)
+            return pdf_bytes
+            
+        except Exception as e:
+            logger.error(f"Error generating PDF: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate PDF resume"
+            )
+    
+    @staticmethod
+    async def customize_resume_for_job_pdf(request: JobResumeCustomizationRequest) -> bytes:
+        """Generate a customized PDF resume for a specific job."""
+        try:
+            # Get LaTeX code first
+            latex_response = await ResumeService.customize_resume_for_job(request)
+            
+            # Extract LaTeX code from the response
+            latex_code = latex_response.result.Output.latex_resume
+            
+            # Generate PDF from LaTeX
+            pdf_bytes = PDFGenerator.generate_pdf_from_latex(latex_code)
+            return pdf_bytes
+            
+        except Exception as e:
+            logger.error(f"Error generating PDF for job customization: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate PDF resume for job"
+            )
+
+    @staticmethod
+    async def customize_resume_for_job(request: JobResumeCustomizationRequest) -> JobResumeCustomizationResponse:
+        """Generate a customized LaTeX resume for a specific job."""
+        try:
+            # Validate input
+            if not request.job_description or not request.job_description.strip():
+                raise HTTPException(status_code=400, detail="Job description is required and cannot be empty")
+            
+            if not request.resume_data or not request.resume_data.strip():
+                raise HTTPException(status_code=400, detail="Resume data is required and cannot be empty")
+            
+            # Prepare the payload for the external API
+            job_details = f"""
+            Job Title: {request.job_title}
+            Company: {request.company_name}
+            Job Description: {request.job_description}
+            """
+            
+            payload = {
+                "job_details": job_details.strip(),
+                "resume_details": request.resume_data.strip()
+            }
+            
+            # Make request to the external LaTeX resume generator API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    os.getenv("CUSTOM_RESUME_BUILDER_API_URL"),
+                    json=payload,
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    latex_code = response.text
+                    return JobResumeCustomizationResponse(
+                        result=LatexResumeResult(
+                            Output=LatexResumeOutput(latex_resume=latex_code)
+                        )
+                    )
+                else:
+                    logger.error(f"External API error: {response.status_code} - {response.text}")
+                    raise HTTPException(
+                        status_code=response.status_code,
+                        detail=f"External API error: {response.text}"
+                    )
+                    
+        except httpx.TimeoutException:
+            logger.error("Timeout while calling external resume generator API")
+            raise HTTPException(
+                status_code=504,
+                detail="Request timeout while generating resume. Please try again."
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error while calling external API: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to connect to resume generator service. Please try again later."
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in customize_resume_for_job: {e}")
             raise HTTPException(
                 status_code=500,
                 detail="An unexpected error occurred while generating the resume"

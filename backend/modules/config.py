@@ -18,16 +18,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Add the JobSpy directory to the Python path - use insert(0) to prioritize
+# Add the JobHunter directory to the Python path - use insert(0) to prioritize
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scraper'))
 
 # FastAPI app configuration
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
     app = FastAPI(
-        title="JobSpy FastAPI",
-        description="A FastAPI wrapper for JobSpy that aggregates job postings from multiple job boards",
-        version="1.0.0"
+        title="JobHunter FastAPI",
+        description="A FastAPI wrapper for JobHunter that aggregates job postings from multiple job boards",
+        version="1.0.6"
     )
     
     # Add CORS middleware

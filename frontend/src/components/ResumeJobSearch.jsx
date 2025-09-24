@@ -7,7 +7,7 @@ const ResumeJobSearch = () => {
   const [keywords, setKeywords] = useState([])
   const [selectedKeyword, setSelectedKeyword] = useState('')
   const [customKeyword, setCustomKeyword] = useState('')
-  const [, setResumeData] = useState(null)
+  const [resumeData, setResumeData] = useState(null)
   const [jobs, setJobs] = useState([])
   const [step, setStep] = useState(1)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -17,6 +17,15 @@ const ResumeJobSearch = () => {
   const [location, setLocation] = useState('India')
   const [resultsWanted, setResultsWanted] = useState(10)
   const [dragActive, setDragActive] = useState(false)
+  
+  // New state for resume customization
+  const [, setSelectedJob] = useState(null)
+  const [, setIsCustomizing] = useState(false)
+  
+  // Add new state for PDF preview
+  const [, setPdfUrl] = useState(null)
+  const [, setShowPdfPreview] = useState(false)
+  const [, setCustomizedResumeData] = useState(null)
 
   const handleDrag = (e) => {
     e.preventDefault()
@@ -198,6 +207,118 @@ const ResumeJobSearch = () => {
     setJobs([])
     setSearchMessage('')
     setError('')
+  }
+
+  const handleCustomizeResume = async (job, resumeData) => {
+    setIsCustomizing(true)
+    try {
+      // Add debugging to see the actual job object structure
+      console.log('Full job object:', job)
+      console.log('Job keys:', Object.keys(job))
+      console.log('Starting resume customization for job:', job.title)
+      
+      // Prepare job details as JSON string
+      const jobDetails = JSON.stringify({
+        id: job.id || `job_${Date.now()}`,
+        title: job.title || 'Job Position',
+        description: job.description || `${job.title} at ${job.company_name}`,
+        company_name: job.company_name || job.company || 'Company',
+        location: job.location || 'Not specified',
+        job_type: job.job_type || 'Not specified',
+        site: job.site || 'Unknown',
+        job_url: job.job_url || '',
+        salary_min: job.salary_min || null,
+        salary_max: job.salary_max || null,
+        salary_currency: job.salary_currency || null,
+        salary_interval: job.salary_interval || null,
+        date_posted: job.date_posted || null,
+        is_remote: job.is_remote || false
+      })
+      
+      // Prepare resume details as JSON string
+      const resumeDetails = typeof resumeData === 'string' ? resumeData : JSON.stringify(resumeData)
+      
+      // First get the LaTeX code
+      const response = await fetch('http://localhost:8000/resume/custom-builder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          job_details: jobDetails,
+          resume_details: resumeDetails
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Resume customization API response received')
+        
+        if (data.success && data.latex_code) {
+          // Parse the latex_code which is a JSON string
+          let latexData
+          try {
+            latexData = JSON.parse(data.latex_code)
+          } catch (parseError) {
+            console.error('Error parsing latex_code:', parseError)
+            throw new Error('Invalid LaTeX data format')
+          }
+          
+          if (latexData.result && latexData.result.Output && latexData.result.Output.latex_resume) {
+            const latexCode = latexData.result.Output.latex_resume
+            console.log('LaTeX code extracted, length:', latexCode.length)
+            
+            // Store the LaTeX code for download
+            setCustomizedResumeData(latexCode)
+            
+            // Now get the PDF from backend
+            const pdfResponse = await fetch('http://localhost:8000/resume/custom-builder/pdf', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                job_details: jobDetails,
+                resume_details: resumeDetails
+              })
+            })
+            
+            if (pdfResponse.ok) {
+              const pdfBlob = await pdfResponse.blob()
+              const pdfBlobUrl = URL.createObjectURL(pdfBlob)
+              setPdfUrl(pdfBlobUrl)
+              setSelectedJob(job)
+              setShowPdfPreview(true)
+              
+              console.log('Resume customization completed successfully')
+            } else {
+              throw new Error('Failed to generate PDF')
+            }
+          } else {
+            console.error('Invalid LaTeX data structure:', latexData)
+            throw new Error('Invalid LaTeX data structure')
+          }
+        } else {
+          console.error('Invalid response structure:', data)
+          throw new Error('Invalid response from server')
+        }
+        
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }))
+        console.error('API Error:', response.status, errorData)
+        throw new Error(`Failed to generate customized resume: ${errorData.detail || 'Server error'}`)
+      }
+    } catch (error) {
+      console.error('Error in handleCustomizeResume:', error)
+      alert(`Error generating customized resume: ${error.message}. Please try again.`)
+    } finally {
+      setIsCustomizing(false)
+    }
+  }
+
+  const handleResumeCustomized = (job) => {
+    setSelectedJob(job)
+    handleCustomizeResume(job, resumeData)
   }
 
   return (
@@ -438,7 +559,7 @@ const ResumeJobSearch = () => {
 
       {/* Step 3: Job Results */}
       {step === 3 && (
-        <div className="space-y-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-orange-100">
           <div className="text-center">
             <h3 className="text-xl font-semibold text-gray-800 mb-2">
               Job Search Results
@@ -457,7 +578,12 @@ const ResumeJobSearch = () => {
           {jobs.length > 0 ? (
             <div className="grid gap-6">
               {jobs.map((job, index) => (
-                <JobCard key={index} job={job} />
+                <JobCard 
+                  key={index} 
+                  job={job} 
+                  resumeData={resumeData}
+                  onResumeCustomized={handleResumeCustomized}
+                />
               ))}
             </div>
           ) : (
@@ -471,7 +597,7 @@ const ResumeJobSearch = () => {
             </div>
           )}
 
-          <div className="flex justify-center space-x-4">
+          <div className="flex justify-center space-x-4 mt-6">
             <button
               onClick={() => setStep(2)}
               className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"

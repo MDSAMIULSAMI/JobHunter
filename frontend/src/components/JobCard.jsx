@@ -1,4 +1,8 @@
-const JobCard = ({ job }) => {
+import { useState } from 'react'
+
+const JobCard = ({ job, resumeData, onResumeCustomized }) => {
+  const [isCustomizing, setIsCustomizing] = useState(false)
+  
   const formatDate = (dateString) => {
     if (!dateString) return 'Date not specified'
     try {
@@ -19,6 +23,56 @@ const JobCard = ({ job }) => {
       return `${curr} ${min.toLocaleString()}+ per ${int}`
     } else if (max) {
       return `Up to ${curr} ${max.toLocaleString()} per ${int}`
+    }
+  }
+
+  const handleCustomizeResume = async () => {
+    if (!resumeData) {
+      alert('Please upload and analyze your resume first to use this feature.')
+      return
+    }
+
+    setIsCustomizing(true)
+    
+    try {
+      // Generate PDF directly
+      const response = await fetch('http://localhost:8000/resume/customize-for-job/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          job_id: job.id || `job_${Date.now()}`,
+          job_title: job.title,
+          job_description: job.description || 'No description available',
+          company_name: job.company_name || 'Company not specified',
+          resume_data: JSON.stringify(resumeData)
+        })
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `resume_${job.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        if (onResumeCustomized) {
+          onResumeCustomized(job) // Remove the first parameter
+        }
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to customize resume: ${errorData.detail || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error customizing resume:', error)
+      alert('Failed to customize resume. Please try again.')
+    } finally {
+      setIsCustomizing(false)
     }
   }
 
@@ -95,6 +149,27 @@ const JobCard = ({ job }) => {
               Company
             </a>
           )}
+          
+          {/* New Customize Resume Button */}
+          <button
+            onClick={handleCustomizeResume}
+            disabled={isCustomizing || !resumeData}
+            className={`px-6 py-2 rounded-full text-center font-semibold transition-all duration-200 ${
+              resumeData 
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-md transform hover:scale-105' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+            title={!resumeData ? 'Upload and analyze your resume first' : 'Customize your resume for this job'}
+          >
+            {isCustomizing ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Customizing...</span>
+              </div>
+            ) : (
+              'Get Customize Resume'
+            )}
+          </button>
         </div>
       </div>
     </div>

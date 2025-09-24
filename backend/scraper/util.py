@@ -17,7 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def create_logger(name: str):
-    logger = logging.getLogger(f"JobSpy:{name}")
+    logger = logging.getLogger(f"JobHunter:{name}")
     logger.propagate = False
     if not logger.handlers:
         logger.setLevel(logging.INFO)
@@ -145,7 +145,7 @@ def set_logger_level(verbose: int):
     level = getattr(logging, level_name.upper(), None)
     if level is not None:
         for logger_name in logging.root.manager.loggerDict:
-            if logger_name.startswith("JobSpy:"):
+            if logger_name.startswith("JobHunter:"):
                 logging.getLogger(logger_name).setLevel(level)
     else:
         raise ValueError(f"Invalid log level: {level_name}")

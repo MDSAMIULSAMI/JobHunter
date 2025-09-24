@@ -9,7 +9,7 @@ const Footer = () => {
                 <span className="text-orange-600 font-bold text-xl">J</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold">JobSpy</h3>
+                <h3 className="text-xl font-bold">JobHunter</h3>
                 <p className="text-orange-200 text-sm">Smart Job Search</p>
               </div>
             </div>
@@ -50,7 +50,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-orange-700 mt-8 pt-8 text-center text-orange-200">
-          <p>&copy; 2024 JobSpy. All rights reserved. Built with ❤️ for job seekers.</p>
+          <p>&copy; 2024 JobHunter. All rights reserved. Built with ❤️ for job seekers.</p>
         </div>
       </div>
     </footer>

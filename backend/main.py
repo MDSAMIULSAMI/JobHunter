@@ -1,7 +1,7 @@
 """
-FastAPI JobSpy Application - Refactored Main Entry Point
+FastAPI JobHunter Application - Refactored Main Entry Point
 
-This is the main entry point for the JobSpy FastAPI application.
+This is the main entry point for the JobHunter FastAPI application.
 The application has been refactored into modular components for better maintainability.
 """
 
@@ -26,7 +26,7 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Log application startup
-# logger.info("JobSpy FastAPI application started successfully")
+# logger.info("JobHunter FastAPI application started successfully")
 # logger.info("Available endpoints:")
 # logger.info("  - GET  /              : Root endpoint")
 # logger.info("  - GET  /health        : Health check")

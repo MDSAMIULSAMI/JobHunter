@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react'
 import Header from './components/Header'
 import Hero from './components/Hero'
 import JobSearch from './components/JobSearch'
-import ResumeAnalyzer from './components/ResumeAnalyzer'
 import ResumeJobSearch from './components/ResumeJobSearch'
-import CustomResumeBuilder from './components/CustomResumeBuilder'
 import Footer from './components/Footer'
 
 function App() {
@@ -34,16 +32,6 @@ function App() {
             🔍 Job Search
           </button>
           <button
-            onClick={() => setActiveTab('resume')}
-            className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 ${
-              activeTab === 'resume'
-                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
-                : 'bg-white text-orange-600 hover:bg-orange-50 shadow-md'
-            }`}
-          >
-            📄 Resume Analyzer
-          </button>
-          <button
             onClick={() => setActiveTab('smart-search')}
             className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 ${
               activeTab === 'smart-search'
@@ -53,24 +41,12 @@ function App() {
           >
             🎯 Smart Resume Search
           </button>
-          <button
-            onClick={() => setActiveTab('builder')}
-            className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 ${
-              activeTab === 'builder'
-                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
-                : 'bg-white text-orange-600 hover:bg-orange-50 shadow-md'
-            }`}
-          >
-            ✏️ Resume Builder
-          </button>
         </div>
 
         {/* Tab Content */}
         <div className="transition-all duration-500 ease-in-out">
           {activeTab === 'search' && <JobSearch />}
-          {activeTab === 'resume' && <ResumeAnalyzer />}
           {activeTab === 'smart-search' && <ResumeJobSearch />}
-          {activeTab === 'builder' && <CustomResumeBuilder />}
         </div>
       </div>
 

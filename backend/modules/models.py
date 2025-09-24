@@ -88,8 +88,51 @@ class CustomResumeRequest(BaseModel):
     resume_details: str = Field(..., description="Resume information to be tailored")
 
 
+# New models for job-specific resume customization
+class JobResumeCustomizationRequest(BaseModel):
+    job_id: str = Field(..., description="Job ID for customization")
+    job_title: str = Field(..., description="Job title")
+    job_description: str = Field(..., description="Job description")
+    company_name: str = Field(..., description="Company name")
+    resume_data: str = Field(..., description="Resume data in string format")
+
+
+class LatexResumeOutput(BaseModel):
+    latex_resume: str = Field(..., description="Generated LaTeX resume code")
+
+
+class LatexResumeResult(BaseModel):
+    Output: LatexResumeOutput
+
+
+class JobResumeCustomizationResponse(BaseModel):
+    id: str = Field(default="M1LATEX003")
+    name: str = Field(default="APIOutput")
+    result: LatexResumeResult
+
+
 class CustomResumeResponse(BaseModel):
     success: bool
     latex_code: str
     message: str
     timestamp: str
+    pdf_available: bool = Field(default=False, description="Whether PDF version is available")
+
+
+class CustomResumeJobRequest(BaseModel):
+    job_description: str = Field(..., description="Job description for tailoring the resume")
+    resume_data: ResumeOutput = Field(..., description="Resume data to be tailored")
+
+
+class CustomResumeJobOutput(BaseModel):
+    latex_resume: str = Field(..., description="Generated LaTeX resume code")
+
+
+class CustomResumeJobResult(BaseModel):
+    Output: CustomResumeJobOutput
+
+
+class CustomResumeJobResponse(BaseModel):
+    id: str = Field(default="M1LATEX003")
+    name: str = Field(default="APIOutput")
+    result: CustomResumeJobResult

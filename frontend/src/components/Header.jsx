@@ -25,7 +25,7 @@ const Header = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                JobSpy
+                JobHunter
               </h1>
               <p className="text-sm text-orange-600/70">Smart Job Search</p>
             </div>
