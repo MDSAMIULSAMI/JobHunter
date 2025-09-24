@@ -5,6 +5,7 @@ import logging
 import sys
 import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -28,6 +29,16 @@ def create_app() -> FastAPI:
         description="A FastAPI wrapper for JobSpy that aggregates job postings from multiple job boards",
         version="1.0.0"
     )
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allows all origins
+        allow_credentials=True,
+        allow_methods=["*"],  # Allows all methods
+        allow_headers=["*"],  # Allows all headers
+    )
+    
     return app
 
 # Global logger instance

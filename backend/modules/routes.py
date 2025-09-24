@@ -9,7 +9,8 @@ from datetime import datetime
 
 from .models import (
     JobSearchRequest, JobSearchResponse, 
-    ResumeAnalysisResponse, CustomResumeRequest, CustomResumeResponse
+    ResumeAnalysisResponse, CustomResumeRequest, CustomResumeResponse,
+    KeywordExtractionResponse, KeywordJobSearchRequest
 )
 from .services import JobService, ResumeService
 from .utils import get_available_sites
@@ -124,6 +125,42 @@ async def upload_resume(resume_file: UploadFile = File(..., description="Resume 
     file_content = await resume_file.read()
     
     return await ResumeService.analyze_resume(file_content, resume_file.filename)
+
+
+@resume_router.post("/upload-with-keywords", response_model=KeywordExtractionResponse)
+async def upload_resume_with_keywords(resume_file: UploadFile = File(..., description="Resume PDF file to analyze and extract keywords")):
+    """
+    Upload a resume PDF file for analysis and extract keywords for job searching
+    
+    This endpoint analyzes the resume and extracts relevant keywords that can be used
+    for job searching. Users can then select from these keywords to conduct targeted job searches.
+    """
+    # Validate file type
+    if not resume_file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed"
+        )
+    
+    # Read the file content
+    file_content = await resume_file.read()
+    
+    return await ResumeService.analyze_resume_with_keywords(file_content, resume_file.filename)
+
+
+@resume_router.post("/search-by-keyword", response_model=JobSearchResponse)
+async def search_jobs_by_keyword(request: KeywordJobSearchRequest):
+    """
+    Search for jobs using a selected keyword from resume analysis
+    
+    - **selected_keyword**: Keyword selected from resume analysis (required)
+    - **location**: Location to search for jobs (default: India)
+    - **results_wanted**: Number of results wanted (1-200, default: 10)
+    
+    This endpoint is typically used after uploading a resume and selecting a keyword
+    from the extracted keywords list.
+    """
+    return await ResumeService.search_jobs_by_keyword(request)
 
 
 @resume_router.post("/custom-builder", response_model=CustomResumeResponse)

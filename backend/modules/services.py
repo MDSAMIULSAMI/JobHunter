@@ -9,7 +9,9 @@ import logging
 import os
 import httpx
 import json
+import re
 from datetime import datetime
+from typing import List
 from fastapi import HTTPException
 
 from scraper import scrape_jobs
@@ -18,6 +20,7 @@ from .utils import get_available_sites, get_country_from_location, process_jobs_
 from .models import (
     JobSearchRequest, JobSearchResponse, JobPost,
     ResumeAnalysisResponse, ResumeResult, ResumeOutput,
+    KeywordExtractionResponse, KeywordJobSearchRequest,
     CustomResumeRequest, CustomResumeResponse
 )
 
@@ -162,6 +165,116 @@ class JobService:
 
 class ResumeService:
     """Service for handling resume analysis and generation."""
+    
+    @staticmethod
+    def extract_keywords_from_resume_data(resume_data: ResumeOutput) -> List[str]:
+        """Extract meaningful keywords from resume data for job searching."""
+        keywords = set()
+        
+        # First priority: Extract from search_keywords if available (JSON string format)
+        if resume_data.search_keywords and resume_data.search_keywords != "Not provided or Not found":
+            try:
+                # Try to parse as JSON array first
+                import json
+                search_keywords_list = json.loads(resume_data.search_keywords)
+                if isinstance(search_keywords_list, list):
+                    for keyword in search_keywords_list:
+                        if isinstance(keyword, str) and len(keyword.strip()) > 2:
+                            keywords.add(keyword.strip())
+            except (json.JSONDecodeError, TypeError):
+                # If JSON parsing fails, treat as comma-separated string
+                search_text = resume_data.search_keywords.lower()
+                search_items = re.split(r'[,;|\n•·-]', search_text)
+                for keyword in search_items:
+                    keyword = keyword.strip()
+                    if len(keyword) > 2:
+                        keywords.add(keyword.title())
+        
+        # Second priority: Extract from field of interest
+        if resume_data.field_of_interest and resume_data.field_of_interest != "Not provided or Not found":
+            field_text = resume_data.field_of_interest.lower()
+            field_items = re.split(r'[,;|\n•·-]', field_text)
+            for field in field_items:
+                field = field.strip()
+                if len(field) > 2:
+                    keywords.add(field.title())
+        
+        # Third priority: Extract from skills
+        if resume_data.skills and resume_data.skills != "Not provided or Not found":
+            skills_text = resume_data.skills.lower()
+            # Split by common delimiters and clean up
+            skill_items = re.split(r'[,;|\n•·-]', skills_text)
+            for skill in skill_items:
+                skill = skill.strip()
+                if len(skill) > 2 and skill not in ['and', 'or', 'the', 'with', 'using']:
+                    keywords.add(skill.title())
+        
+        # Fourth priority: Extract from experience (job titles and technologies)
+        if resume_data.experience and resume_data.experience != "Not provided or Not found":
+            exp_text = resume_data.experience.lower()
+            # Look for common job titles and technologies
+            job_patterns = [
+                r'\b(developer|engineer|analyst|manager|designer|consultant|specialist|coordinator|administrator|architect|lead|senior|junior)\b',
+                r'\b(python|java|javascript|react|node|angular|vue|django|flask|spring|sql|mongodb|postgresql|mysql|aws|azure|docker|kubernetes)\b'
+            ]
+            for pattern in job_patterns:
+                matches = re.findall(pattern, exp_text)
+                for match in matches:
+                    keywords.add(match.title())
+        
+        # Convert to sorted list and limit to reasonable number
+        keyword_list = sorted(list(keywords))[:20]  # Limit to top 20 keywords
+        
+        # If no keywords found, provide some defaults based on available data
+        if not keyword_list:
+            if resume_data.field_of_interest and resume_data.field_of_interest != "Not provided or Not found":
+                keyword_list = [resume_data.field_of_interest]
+            else:
+                keyword_list = ["Software Developer", "Data Analyst", "Project Manager"]
+        
+        return keyword_list
+    
+    @staticmethod
+    async def analyze_resume_with_keywords(file_content: bytes, filename: str) -> KeywordExtractionResponse:
+        """Analyze resume PDF file and return resume data with search keywords."""
+        try:
+            # First, get the standard resume analysis
+            resume_analysis = await ResumeService.analyze_resume(file_content, filename)
+            
+            # Return the response with only resume data (which includes search_keywords)
+            return KeywordExtractionResponse(
+                success=True,
+                resume_data=resume_analysis.result.Output,
+                timestamp=datetime.now().isoformat()
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_resume_with_keywords: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to analyze resume: {str(e)}"
+            )
+    
+    @staticmethod
+    async def search_jobs_by_keyword(request: KeywordJobSearchRequest) -> JobSearchResponse:
+        """Search for jobs using a selected keyword from resume analysis."""
+        try:
+            # Create a job search request
+            job_request = JobSearchRequest(
+                location=request.location,
+                search_keyword=request.selected_keyword,
+                results_wanted=request.results_wanted
+            )
+            
+            # Use the existing job search functionality
+            return await JobService.search_jobs(job_request)
+            
+        except Exception as e:
+            logger.error(f"Error in search_jobs_by_keyword: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to search jobs by keyword: {str(e)}"
+            )
     
     @staticmethod
     async def analyze_resume(file_content: bytes, filename: str) -> ResumeAnalysisResponse:

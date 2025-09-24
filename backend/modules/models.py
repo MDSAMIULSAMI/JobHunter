@@ -70,6 +70,19 @@ class ResumeAnalysisResponse(BaseModel):
     result: ResumeResult
 
 
+# New models for keyword extraction and job search integration
+class KeywordExtractionResponse(BaseModel):
+    success: bool
+    resume_data: ResumeOutput
+    timestamp: str
+
+
+class KeywordJobSearchRequest(BaseModel):
+    selected_keyword: str = Field(..., description="Selected keyword from resume analysis")
+    location: str = Field(default="India", description="Location to search for jobs")
+    results_wanted: Optional[int] = Field(default=10, ge=1, le=200, description="Number of results wanted (1-200)")
+
+
 class CustomResumeRequest(BaseModel):
     job_details: str = Field(..., description="Job details/description for tailoring the resume")
     resume_details: str = Field(..., description="Resume information to be tailored")
