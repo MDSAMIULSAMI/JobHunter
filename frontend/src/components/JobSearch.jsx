@@ -86,7 +86,7 @@ const JobSearch = () => {
             
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-orange-700">
-                💼 Job Title/Keywords
+                💼 Job Title
               </label>
               <input
                 type="text"

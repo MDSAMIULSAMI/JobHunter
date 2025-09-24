@@ -50,7 +50,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-orange-700 mt-8 pt-8 text-center text-orange-200">
-          <p>&copy; 2024 JobHunter. All rights reserved. Built with ❤️ for job seekers.</p>
+          <p>&copy; {new Date().getFullYear()} JobHunter. All rights reserved. Built with ❤️ for job seekers.</p>
         </div>
       </div>
     </footer>

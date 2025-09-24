@@ -34,7 +34,7 @@ const Hero = () => {
   }, [currentText, currentIndex, isDeleting, texts])
 
   return (
-    <section className="pt-24 pb-16 px-4">
+    <section className="pt-24 px-4">
       <div className="container mx-auto text-center">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-7xl font-bold mb-6">
@@ -48,15 +48,6 @@ const Hero = () => {
             Harness the power of AI to search jobs across multiple platforms, 
             analyze your resume, and build tailored applications that get noticed.
           </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-              Start Job Search 🚀
-            </button>
-            <button className="border-2 border-orange-300 text-orange-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-orange-50 transition-all duration-300 transform hover:scale-105">
-              Watch Demo 📹
-            </button>
-          </div>
         </div>
         
         {/* Floating Elements */}
