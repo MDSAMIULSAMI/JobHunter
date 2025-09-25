@@ -10,6 +10,7 @@ class JobSearchRequest(BaseModel):
     location: str = Field(default="India", description="Location to search for jobs (required)")
     search_keyword: str = Field(..., description="Search keyword (required)")
     results_wanted: Optional[int] = Field(default=10, ge=1, le=200, description="Number of results wanted (1-200)")
+    is_remote: Optional[bool] = Field(default=None, description="Filter for remote jobs: True for remote only, False for non-remote only, None for mixed")
 
 
 class JobPost(BaseModel):
@@ -81,6 +82,7 @@ class KeywordJobSearchRequest(BaseModel):
     selected_keyword: str = Field(..., description="Selected keyword from resume analysis")
     location: str = Field(default="India", description="Location to search for jobs")
     results_wanted: Optional[int] = Field(default=10, ge=1, le=200, description="Number of results wanted (1-200)")
+    is_remote: Optional[bool] = Field(default=None, description="Filter for remote jobs: True for remote only, False for non-remote only, None for mixed")
 
 
 class CustomResumeRequest(BaseModel):

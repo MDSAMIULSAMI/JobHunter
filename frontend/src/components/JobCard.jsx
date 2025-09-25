@@ -81,11 +81,22 @@ const JobCard = ({ job, resumeData, onResumeCustomized }) => {
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-start justify-between mb-3">
-            <h4 className="text-xl font-bold text-orange-800 hover:text-orange-600 transition-colors">
-              <a href={job.job_url} target="_blank" rel="noopener noreferrer">
-                {job.title}
-              </a>
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xl font-bold text-orange-800 hover:text-orange-600 transition-colors">
+                <a href={job.job_url} target="_blank" rel="noopener noreferrer">
+                  {job.title}
+                </a>
+              </h4>
+              {job.is_remote !== undefined && (
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  job.is_remote 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {job.is_remote ? 'Remote' : 'On-site'}
+                </span>
+              )}
+            </div>
             <span className="bg-orange-200 text-orange-800 px-3 py-1 rounded-full text-sm font-medium ml-4">
               {job.site}
             </span>
@@ -101,7 +112,6 @@ const JobCard = ({ job, resumeData, onResumeCustomized }) => {
             {job.location && (
               <p className="text-orange-600 flex items-center">
                 📍 {job.location}
-                {job.is_remote && <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Remote</span>}
               </p>
             )}
             

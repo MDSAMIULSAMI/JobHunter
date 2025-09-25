@@ -13,6 +13,7 @@ import re
 from datetime import datetime
 from typing import List
 from fastapi import HTTPException
+from typing import Optional
 
 from scraper import scrape_jobs
 from scraper.model import Site
@@ -34,7 +35,7 @@ class JobService:
     """Service for handling job search operations."""
     
     @staticmethod
-    def scrape_jobs_wrapper(location: str, search_keyword: str, results_wanted: int) -> pd.DataFrame:
+    def scrape_jobs_wrapper(location: str, search_keyword: str, results_wanted: int, is_remote: Optional[bool] = None) -> pd.DataFrame:
         """Wrapper function to scrape jobs from all available sites"""
         try:
             # Get available sites with location-based optimization
@@ -46,6 +47,7 @@ class JobService:
             logger.info(f"Starting job scraping for '{search_keyword}' in '{location}' from {len(sites)} sites")
             logger.info(f"Sites: {[site.value for site in sites]}")
             logger.info(f"Using country code: {country_code}")
+            logger.info(f"Remote filter: {is_remote}")
             
             # Check if we're dealing with Bangladesh locations (BDJobs)
             location_lower = location.lower().strip()
@@ -61,19 +63,89 @@ class JobService:
                 # For other locations/sites, use 72-hour filter
                 hours_old_param = 72
             
+            # If remote filtering is needed, request more jobs initially to account for filtering
+            initial_results_wanted = results_wanted
+            if is_remote is not None:
+                # Request 2-3x more jobs to ensure we have enough after filtering
+                initial_results_wanted = min(results_wanted * 3, 200)  # Cap at 200 (API limit)
+                logger.info(f"Remote filtering enabled - requesting {initial_results_wanted} jobs initially to ensure {results_wanted} after filtering")
+            
             # Scrape jobs from all sites
             jobs_df = scrape_jobs(
                 site_name=sites,
                 search_term=search_keyword,
                 location=location,
-                results_wanted=results_wanted,
+                results_wanted=initial_results_wanted,
                 hours_old=hours_old_param,  # Conditional hours_old parameter
-                is_remote=False,  # Include both remote and on-site jobs
+                is_remote=is_remote if is_remote is not None else False,  # Pass the is_remote filter
                 country_indeed=country_code,  # Use dynamic country detection
-                verbose=1
+                verbose=2  # Increase verbosity to see more detailed logs
             )
             
             logger.info(f"Successfully scraped {len(jobs_df)} jobs")
+            
+            # Apply post-scraping filtering if needed
+            if is_remote is not None and not jobs_df.empty:
+                initial_count = len(jobs_df)
+                if 'is_remote' in jobs_df.columns:
+                    if is_remote:
+                        # Filter for remote jobs only
+                        jobs_df = jobs_df[jobs_df['is_remote'] == True]
+                    else:
+                        # Filter for non-remote jobs only
+                        jobs_df = jobs_df[jobs_df['is_remote'] != True]
+                    
+                    filtered_count = len(jobs_df)
+                    logger.info(f"Filtered jobs from {initial_count} to {filtered_count} based on remote preference")
+                    
+                    # If we still don't have enough jobs after filtering, try to get more
+                    if filtered_count < results_wanted and initial_results_wanted < 200:
+                        logger.info(f"Only {filtered_count} jobs after filtering, need {results_wanted}. Attempting additional scraping...")
+                        additional_needed = results_wanted - filtered_count
+                        additional_to_request = min(additional_needed * 2, 200 - initial_results_wanted)
+                        
+                        if additional_to_request > 0:
+                            try:
+                                additional_jobs_df = scrape_jobs(
+                                    site_name=sites,
+                                    search_term=search_keyword,
+                                    location=location,
+                                    results_wanted=additional_to_request,
+                                    hours_old=hours_old_param,
+                                    is_remote=is_remote if is_remote is not None else False,
+                                    country_indeed=country_code,
+                                    verbose=2
+                                )
+                                
+                                if not additional_jobs_df.empty:
+                                    # Apply the same filtering to additional jobs
+                                    if 'is_remote' in additional_jobs_df.columns:
+                                        if is_remote:
+                                            additional_jobs_df = additional_jobs_df[additional_jobs_df['is_remote'] == True]
+                                        else:
+                                            additional_jobs_df = additional_jobs_df[additional_jobs_df['is_remote'] != True]
+                                    
+                                    # Combine with existing jobs, avoiding duplicates
+                                    if 'job_url' in jobs_df.columns and 'job_url' in additional_jobs_df.columns:
+                                        # Remove duplicates based on job_url
+                                        existing_urls = set(jobs_df['job_url'].tolist())
+                                        additional_jobs_df = additional_jobs_df[~additional_jobs_df['job_url'].isin(existing_urls)]
+                                    
+                                    jobs_df = pd.concat([jobs_df, additional_jobs_df], ignore_index=True)
+                                    logger.info(f"Added {len(additional_jobs_df)} additional jobs, total now: {len(jobs_df)}")
+                            except Exception as e:
+                                logger.warning(f"Failed to get additional jobs: {str(e)}")
+            
+            # Limit to exact results_wanted
+            if len(jobs_df) > results_wanted:
+                jobs_df = jobs_df.head(results_wanted)
+                logger.info(f"Limited results to exactly {results_wanted} jobs as requested")
+            
+            # Add debugging to see which sites returned jobs
+            if not jobs_df.empty and 'site' in jobs_df.columns:
+                site_counts = jobs_df['site'].value_counts()
+                logger.info(f"Jobs by site: {site_counts.to_dict()}")
+            
             return jobs_df
             
         except Exception as e:
@@ -84,7 +156,7 @@ class JobService:
             # Return empty DataFrame instead so the API can still respond gracefully
             logger.warning("Returning empty DataFrame due to scraping errors")
             return pd.DataFrame()
-    
+
     @staticmethod
     async def search_jobs(request: JobSearchRequest) -> JobSearchResponse:
         """Search for jobs based on request parameters."""
@@ -104,13 +176,18 @@ class JobService:
                     JobService.scrape_jobs_wrapper,
                     request.location,
                     request.search_keyword,
-                    request.results_wanted
+                    request.results_wanted,
+                    request.is_remote
                 )
             
             # Process the results
             if jobs_df.empty:
                 # Provide more informative message when no jobs are found
-                message = f"No jobs found for '{request.search_keyword}' in '{request.location}'. This could be due to site restrictions, rate limiting, or no matching jobs available."
+                remote_filter_msg = ""
+                if request.is_remote is not None:
+                    remote_filter_msg = f" (remote filter: {'remote only' if request.is_remote else 'non-remote only'})"
+                
+                message = f"No jobs found for '{request.search_keyword}' in '{request.location}'{remote_filter_msg}. This could be due to site restrictions, rate limiting, or no matching jobs available."
                 response_data = {
                     "success": True,
                     "message": message,
@@ -119,7 +196,8 @@ class JobService:
                     "search_params": {
                         "location": request.location,
                         "search_keyword": request.search_keyword,
-                        "results_wanted": request.results_wanted
+                        "results_wanted": request.results_wanted,
+                        "is_remote": request.is_remote
                     },
                     "timestamp": datetime.now().isoformat()
                 }
@@ -139,7 +217,8 @@ class JobService:
                     "search_params": {
                         "location": request.location,
                         "search_keyword": request.search_keyword,
-                        "results_wanted": request.results_wanted
+                        "results_wanted": request.results_wanted,
+                        "is_remote": request.is_remote
                     },
                     "timestamp": datetime.now().isoformat()
                 }
@@ -149,21 +228,11 @@ class JobService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in search_jobs: {str(e)}")
-            # Return a more user-friendly error response instead of generic 500
-            response_data = {
-                "success": False,
-                "message": f"Unable to complete job search due to technical issues. Many job sites may be blocking requests or experiencing issues. Error: {str(e)}",
-                "total_jobs": 0,
-                "jobs": [],
-                "search_params": {
-                    "location": request.location,
-                    "search_keyword": request.search_keyword,
-                    "results_wanted": request.results_wanted
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-            return JobSearchResponse(**response_data)
+            logger.error(f"Error in search_jobs: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to search jobs: {str(e)}"
+            )
 
 
 class ResumeService:
@@ -266,7 +335,8 @@ class ResumeService:
             job_request = JobSearchRequest(
                 location=request.location,
                 search_keyword=request.selected_keyword,
-                results_wanted=request.results_wanted
+                results_wanted=request.results_wanted,
+                is_remote=request.is_remote
             )
             
             # Use the existing job search functionality

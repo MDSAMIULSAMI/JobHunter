@@ -159,6 +159,7 @@ async def search_jobs_by_keyword(request: KeywordJobSearchRequest):
     - **selected_keyword**: Keyword selected from resume analysis (required)
     - **location**: Location to search for jobs (default: India)
     - **results_wanted**: Number of results wanted (1-200, default: 10)
+    - **is_remote**: Filter for remote jobs - True for remote only, False for non-remote only, None/empty for mixed (optional)
     
     This endpoint is typically used after uploading a resume and selecting a keyword
     from the extracted keywords list.

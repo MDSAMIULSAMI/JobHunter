@@ -16,6 +16,7 @@ const ResumeJobSearch = () => {
   const [searchMessage, setSearchMessage] = useState('')
   const [location, setLocation] = useState('India')
   const [resultsWanted, setResultsWanted] = useState(10)
+  const [isRemote, setIsRemote] = useState(null)
   const [dragActive, setDragActive] = useState(false)
   
   // New state for resume customization
@@ -136,7 +137,8 @@ const ResumeJobSearch = () => {
         body: JSON.stringify({
           selected_keyword: selectedKeyword,
           location: location,
-          results_wanted: resultsWanted
+          results_wanted: resultsWanted,
+          is_remote: isRemote
         })
       })
 
@@ -176,7 +178,8 @@ const ResumeJobSearch = () => {
         body: JSON.stringify({
           selected_keyword: customKeyword.trim(),
           location: location,
-          results_wanted: resultsWanted
+          results_wanted: resultsWanted,
+          is_remote: isRemote
         })
       })
 
@@ -483,7 +486,7 @@ const ResumeJobSearch = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Location
@@ -495,6 +498,23 @@ const ResumeJobSearch = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder="e.g., India, New York, Remote"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Work Type
+              </label>
+              <select
+                value={isRemote === null ? 'all' : isRemote.toString()}
+                onChange={(e) => {
+                  const value = e.target.value === 'all' ? null : e.target.value === 'true'
+                  setIsRemote(value)
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                <option value="all">All Jobs</option>
+                <option value="true">Remote Only</option>
+                <option value="false">On-site Only</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

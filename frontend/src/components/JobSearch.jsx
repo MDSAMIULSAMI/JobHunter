@@ -7,7 +7,8 @@ const JobSearch = () => {
   const [searchData, setSearchData] = useState({
     location: 'India',
     search_keyword: '',
-    results_wanted: 10
+    results_wanted: 10,
+    is_remote: null
   })
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(false)
@@ -70,7 +71,7 @@ const JobSearch = () => {
         </h2>
         
         <form onSubmit={handleSearch} className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-4 gap-6">
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-orange-700">
                 📍 Location
@@ -96,6 +97,24 @@ const JobSearch = () => {
                 placeholder="e.g., Software Engineer, Data Scientist"
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-orange-700">
+                🏠 Work Type
+              </label>
+              <select
+                value={searchData.is_remote === null ? 'all' : searchData.is_remote.toString()}
+                onChange={(e) => {
+                  const value = e.target.value === 'all' ? null : e.target.value === 'true'
+                  setSearchData({...searchData, is_remote: value})
+                }}
+                className="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:border-orange-500 focus:outline-none transition-colors duration-200"
+              >
+                <option value="all">All Jobs</option>
+                <option value="true">Remote Only</option>
+                <option value="false">On-site Only</option>
+              </select>
             </div>
             
             <div className="space-y-2">

@@ -94,19 +94,35 @@ def scrape_jobs(
     )
 
     def scrape_site(site: Site) -> Tuple[str, JobResponse]:
-        scraper_class = SCRAPER_MAPPING[site]
-        scraper = scraper_class(proxies=proxies, ca_cert=ca_cert, user_agent=user_agent)
-        scraped_data: JobResponse = scraper.scrape(scraper_input)
-        cap_name = site.value.capitalize()
-        site_name = "LinkedIn" if cap_name == "Linkedin" else cap_name
-        create_logger(site_name).info(f"finished scraping")
-        return site.value, scraped_data
+        try:
+            scraper_class = SCRAPER_MAPPING[site]
+            scraper = scraper_class(proxies=proxies, ca_cert=ca_cert, user_agent=user_agent)
+            scraped_data: JobResponse = scraper.scrape(scraper_input)
+            cap_name = site.value.capitalize()
+            site_name = "LinkedIn" if cap_name == "Linkedin" else cap_name
+            logger = create_logger(site_name)
+            logger.info(f"finished scraping - found {len(scraped_data.jobs)} jobs")
+            return site.value, scraped_data
+        except Exception as e:
+            cap_name = site.value.capitalize()
+            site_name = "LinkedIn" if cap_name == "Linkedin" else cap_name
+            logger = create_logger(site_name)
+            logger.error(f"Error scraping {site_name}: {str(e)}")
+            # Return empty JobResponse instead of failing completely
+            return site.value, JobResponse(jobs=[])
 
     site_to_jobs_dict = {}
 
     def worker(site):
-        site_val, scraped_info = scrape_site(site)
-        return site_val, scraped_info
+        try:
+            site_val, scraped_info = scrape_site(site)
+            return site_val, scraped_info
+        except Exception as e:
+            cap_name = site.value.capitalize()
+            site_name = "LinkedIn" if cap_name == "Linkedin" else cap_name
+            logger = create_logger(site_name)
+            logger.error(f"Worker error for {site_name}: {str(e)}")
+            return site.value, JobResponse(jobs=[])
 
     with ThreadPoolExecutor() as executor:
         future_to_site = {
@@ -114,8 +130,12 @@ def scrape_jobs(
         }
 
         for future in as_completed(future_to_site):
-            site_value, scraped_data = future.result()
-            site_to_jobs_dict[site_value] = scraped_data
+            try:
+                site_value, scraped_data = future.result()
+                site_to_jobs_dict[site_value] = scraped_data
+            except Exception as e:
+                # Log the error but continue with other sites
+                create_logger("Scraper").error(f"Future result error: {str(e)}")
 
     jobs_dfs: list[pd.DataFrame] = []
 
@@ -204,9 +224,10 @@ def scrape_jobs(
         # Reorder the DataFrame according to the desired order
         jobs_df = jobs_df[desired_order]
 
-        # Step 4: Sort the DataFrame as required
+        # Step 4: Sort the DataFrame to mix jobs from different sites
+        # Instead of grouping by site, sort by date_posted to get the most recent jobs mixed from all sites
         return jobs_df.sort_values(
-            by=["site", "date_posted"], ascending=[True, False]
+            by=["date_posted"], ascending=[False]
         ).reset_index(drop=True)
     else:
         return pd.DataFrame()
