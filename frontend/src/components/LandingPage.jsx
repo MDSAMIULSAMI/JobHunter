@@ -45,7 +45,7 @@ const LandingPage = () => {
     ],
     backend: [
       { name: "FastAPI", icon: "🐍" },
-      { name: "JobSpy", icon: "🔍" },
+      { name: "Scrapper", icon: "🔍" },
       { name: "Pandas", icon: "📊" },
       { name: "LaTeX/PDF", icon: "📄" }
     ]

@@ -87,7 +87,7 @@ const About = () => {
                 </div>
                 <div className="bg-orange-50 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-2">🔍</div>
-                  <div className="font-semibold text-orange-700">JobSpy</div>
+                  <div className="font-semibold text-orange-700">Scrapper</div>
                 </div>
                 <div className="bg-orange-50 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-2">📊</div>
