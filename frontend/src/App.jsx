@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
@@ -45,13 +45,13 @@ function App() {
                     <HomePage />
                   </SignedIn>
                   <SignedOut>
-                    <RedirectToSignIn />
+                    <Navigate to="/" replace />
                   </SignedOut>
                 </>
               } 
             />
             
-            {/* Redirect unsigned users to sign in */}
+            {/* Redirect unsigned users to home */}
             <Route 
               path="/protected/*" 
               element={
@@ -62,7 +62,7 @@ function App() {
                     </Routes>
                   </SignedIn>
                   <SignedOut>
-                    <RedirectToSignIn />
+                    <Navigate to="/" replace />
                   </SignedOut>
                 </>
               } 
